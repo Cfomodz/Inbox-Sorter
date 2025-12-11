@@ -141,7 +141,8 @@ def auth():
     )
     authorization_url, state = flow.authorization_url(
         access_type='offline',
-        include_granted_scopes='true'
+        include_granted_scopes='true',
+        prompt='consent'  # Force consent to always get refresh_token
     )
     session['state'] = state
     return redirect(authorization_url)
@@ -226,8 +227,13 @@ def fetch_emails():
     if 'credentials' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
-    credentials = Credentials(**session['credentials'])
-    service = build('gmail', 'v1', credentials=credentials)
+    try:
+        credentials = Credentials(**session['credentials'])
+        service = build('gmail', 'v1', credentials=credentials)
+    except Exception as e:
+        # Clear invalid session and ask user to re-auth
+        session.clear()
+        return jsonify({'error': 'Session expired. Please sign in again.'}), 401
     
     # Check if we're loading more or starting fresh
     load_more = request.args.get('load_more', 'false') == 'true'
@@ -240,27 +246,42 @@ def fetch_emails():
     messages = []
     fetched_pages = 0
     
-    while len(messages) < EMAILS_PER_FETCH:
-        results = service.users().messages().list(
-            userId='me',
-            labelIds=['INBOX'],
-            maxResults=min(100, EMAILS_PER_FETCH - len(messages)),
-            pageToken=page_token
-        ).execute()
-        
-        if 'messages' in results:
-            messages.extend(results['messages'])
-        
-        page_token = results.get('nextPageToken')
-        fetched_pages += 1
-        
-        if not page_token:
-            break
-        
-        time.sleep(0.1)
+    print(f"[FETCH] Starting to fetch up to {EMAILS_PER_FETCH} message IDs...")
+    
+    try:
+        while len(messages) < EMAILS_PER_FETCH:
+            results = service.users().messages().list(
+                userId='me',
+                labelIds=['INBOX'],
+                maxResults=min(100, EMAILS_PER_FETCH - len(messages)),
+                pageToken=page_token
+            ).execute()
+            
+            if 'messages' in results:
+                messages.extend(results['messages'])
+                print(f"[FETCH] Got {len(messages)} message IDs so far...")
+            
+            page_token = results.get('nextPageToken')
+            fetched_pages += 1
+            
+            if not page_token:
+                print(f"[FETCH] No more messages in inbox.")
+                break
+            
+            time.sleep(0.1)
+    except Exception as e:
+        print(f"[FETCH] Error listing messages: {e}")
+        # Handle expired credentials or other API errors
+        if 'RefreshError' in str(type(e).__name__) or 'refresh' in str(e).lower():
+            session.clear()
+            return jsonify({'error': 'Session expired. Please sign in again.'}), 401
+        raise
+    
+    print(f"[FETCH] Got {len(messages)} message IDs. Now fetching details...")
     
     # Fetch details for each message with rate limiting
     emails_by_domain = {}
+    start_time = time.time()
     
     for i, msg in enumerate(messages):
         try:
@@ -270,6 +291,13 @@ def fetch_emails():
                 format='metadata',
                 metadataHeaders=['From', 'Subject', 'Date']
             ).execute()
+            
+            # Progress logging every 50 messages
+            if (i + 1) % 50 == 0:
+                elapsed = time.time() - start_time
+                rate = (i + 1) / elapsed if elapsed > 0 else 0
+                remaining = (len(messages) - i - 1) / rate if rate > 0 else 0
+                print(f"[FETCH] Processed {i + 1}/{len(messages)} emails ({rate:.1f}/sec, ~{remaining:.0f}s remaining)")
             
             headers = msg_data.get('payload', {}).get('headers', [])
             from_header = get_header_value(headers, 'From')
@@ -296,15 +324,24 @@ def fetch_emails():
                 'snippet': msg_data.get('snippet', '')
             })
             
-            # Rate limiting
+            # Rate limiting - pause briefly every batch
             if (i + 1) % BATCH_SIZE == 0 and i + 1 < len(messages):
+                print(f"[FETCH] Rate limit pause ({BATCH_DELAY}s)...")
                 time.sleep(BATCH_DELAY)
                 
         except Exception as e:
             print(f"Error fetching message {msg['id']}: {e}")
+            # Handle expired credentials
+            if 'RefreshError' in str(type(e).__name__) or 'refresh' in str(e).lower():
+                session.clear()
+                return jsonify({'error': 'Session expired. Please sign in again.'}), 401
+            # Handle rate limits
             if 'rateLimitExceeded' in str(e) or '429' in str(e):
                 time.sleep(5)
             continue
+    
+    total_time = time.time() - start_time
+    print(f"[FETCH] Done! Processed {len(messages)} emails in {total_time:.1f}s ({len(messages)/total_time:.1f}/sec)")
     
     # Merge with existing cache if loading more
     if cached and load_more:

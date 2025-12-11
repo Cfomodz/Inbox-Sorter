@@ -532,49 +532,78 @@
             fetchBtn.disabled = true;
             loadMoreBtn.disabled = true;
             
+            // Progress messages with duration weights (higher = stays longer)
             const messages = [
-                'Connecting to Gmail API...',
-                'Authenticating...',
-                'Fetching message list...',
-                'Preparing to fetch 1,000 emails...',
-                'Processing 40 emails, then pausing 1s...',
-                'Estimated time: ~30 seconds',
-                'Downloading headers...',
-                'Rate limit pause...',
-                'Extracting senders...',
-                'Processing domains...',
-                'Still working...',
-                'Fetching batch...',
-                'Parsing metadata...',
-                'Almost done...',
+                { text: 'Connecting to Gmail API...', weight: 1 },
+                { text: 'Fetching message list from inbox...', weight: 2 },
+                { text: 'Found messages, preparing batch fetch...', weight: 1 },
+                { text: 'Downloading email headers...', weight: 8 },
+                { text: 'Processing sender information...', weight: 6 },
+                { text: 'Extracting domains...', weight: 5 },
+                { text: 'Rate limit pause...', weight: 2 },
+                { text: 'Continuing fetch...', weight: 7 },
+                { text: 'Parsing metadata...', weight: 6 },
+                { text: 'Processing batch...', weight: 8 },
+                { text: 'Still fetching... large batches take time', weight: 10 },
+                { text: 'Building domain index...', weight: 4 },
+                { text: 'Sorting results...', weight: 2 },
             ];
             let msgIndex = 0;
             
-            // Progress bar for ~30 seconds (1000 emails / 40 per batch = 25 batches)
+            // Progress bar - VERY slow for ~5 min fetch
+            // 300 seconds, update every 500ms = 600 ticks, need to reach ~90%
             let progressValue = 0;
             const progressInterval = setInterval(() => {
-                progressValue += 1.5 + (Math.random() * 0.5);
+                progressValue += 0.15 + (Math.random() * 0.05);
                 if (progressValue > 90) progressValue = 90;
                 progress.style.width = progressValue + '%';
             }, 500);
             
-            progressLog.textContent = messages[0];
-            const messageInterval = setInterval(() => {
-                msgIndex = (msgIndex + 1) % messages.length;
-                progressLog.textContent = messages[msgIndex];
-            }, 2000);
+            // Variable timing for messages based on weight
+            progressLog.textContent = messages[0].text;
+            let messageTimeout;
+            
+            function showNextMessage() {
+                msgIndex++;
+                if (msgIndex < messages.length) {
+                    progressLog.textContent = messages[msgIndex].text;
+                    // Base time 3-6 seconds, multiplied by weight
+                    const baseTime = 3000 + Math.random() * 3000;
+                    const delay = baseTime * (messages[msgIndex].weight / 3);
+                    messageTimeout = setTimeout(showNextMessage, delay);
+                }
+                // Don't cycle - just stay on last message
+            }
+            
+            // Start message progression after initial message
+            messageTimeout = setTimeout(showNextMessage, 2000);
 
             try {
                 const url = loadMore ? '/fetch-emails?load_more=true' : '/fetch-emails';
                 const res = await fetch(url);
+                
+                // Handle auth errors
+                if (res.status === 401) {
+                    clearInterval(progressInterval);
+                    clearInterval(messageInterval);
+                    alert('Session expired. Please sign in again.');
+                    window.location.href = '/auth';
+                    return;
+                }
+                
                 const data = await res.json();
 
                 clearInterval(progressInterval);
-                clearInterval(messageInterval);
+                clearTimeout(messageTimeout);
                 progress.style.width = '100%';
                 progressLog.textContent = `Done! Fetched ${data.fetched_this_batch} emails.`;
 
                 if (data.error) {
+                    if (data.error.includes('Session expired') || data.error.includes('sign in')) {
+                        alert('Session expired. Please sign in again.');
+                        window.location.href = '/auth';
+                        return;
+                    }
                     alert(data.error);
                     loading.classList.add('hidden');
                     return;
@@ -600,7 +629,7 @@
                 }, 300);
             } catch (err) {
                 clearInterval(progressInterval);
-                clearInterval(messageInterval);
+                clearTimeout(messageTimeout);
                 progressLog.textContent = 'Error occurred';
                 alert('Error fetching emails: ' + err.message);
                 loading.classList.add('hidden');
