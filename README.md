@@ -6,6 +6,8 @@ A simple app that pulls your Gmail inbox and sorts emails by sender domain. See 
 ![Flask](https://img.shields.io/badge/flask-3.0-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
 
+<img width="3009" height="1917" alt="Screenshot_20251210_211222" src="https://github.com/user-attachments/assets/1d22a5b4-951a-4df1-85a0-dc0e9a3d2a47" />
+
 ## Features
 
 - 🔐 Secure OAuth2 authentication (read-only access)
