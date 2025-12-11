@@ -20,8 +20,8 @@ A simple app that pulls your Gmail inbox and sorts emails by sender domain. See 
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/yourusername/inbox-sorter.git
-cd inbox-sorter
+git clone https://github.com/Cfomodz/inbox-cleaner.git
+cd inbox-cleaner
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
