@@ -1,0 +1,94 @@
+# 📬 Inbox Sorter
+
+A simple app that pulls your Gmail inbox and sorts emails by sender domain. See at a glance who's filling up your inbox.
+
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![Flask](https://img.shields.io/badge/flask-3.0-green.svg)
+![License](https://img.shields.io/badge/license-MIT-purple.svg)
+
+## Features
+
+- 🔐 Secure OAuth2 authentication (read-only access)
+- 📊 Groups emails by sender domain
+- 📈 Shows email count per domain
+- 🔍 Expandable cards to browse individual emails
+- ⚡ Fetch up to 10,000 emails
+
+## Quick Start
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/yourusername/inbox-sorter.git
+cd inbox-sorter
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 2. Set Up Google OAuth
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or select existing)
+3. Enable the **Gmail API**:
+   - Navigate to "APIs & Services" → "Library"
+   - Search for "Gmail API" and enable it
+4. Configure OAuth consent screen:
+   - Go to "APIs & Services" → "OAuth consent screen"
+   - Choose "External" user type
+   - Fill in app name and contact emails
+   - Add scope: `https://www.googleapis.com/auth/gmail.readonly`
+   - Add your email as a test user (required while in testing mode)
+5. Create credentials:
+   - Go to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth client ID"
+   - Choose "Web application"
+   - Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+   - Copy the Client ID and Client Secret
+
+### 3. Configure Environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+
+```
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+SECRET_KEY=generate-a-random-secret-key
+```
+
+### 4. Run
+
+```bash
+python app.py
+```
+
+Open http://localhost:3000 in your browser.
+
+## Usage
+
+1. Click **Sign in with Google**
+2. Authorize the app (read-only access to your emails)
+3. Select how many emails to fetch
+4. Click **Fetch & Sort**
+5. Click on any domain to expand and see individual emails
+
+## Security
+
+- **Read-only access**: The app only requests permission to read emails, never modify or delete
+- **No storage**: Emails are fetched fresh each time and never stored on any server
+- **Session-based**: Your credentials are stored only in your browser session
+
+## Tech Stack
+
+- **Backend**: Python, Flask
+- **Auth**: Google OAuth 2.0
+- **API**: Gmail API
+- **Frontend**: Vanilla HTML/CSS/JS
+
+## License
+
+MIT
