@@ -282,6 +282,45 @@
             font-family: 'JetBrains Mono', monospace;
         }
 
+        .domain-actions-bar {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-deep);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .btn-copy-search,
+        .btn-hide-domain {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-copy-search:hover {
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+
+        .btn-copy-search.copied {
+            color: var(--success);
+            border-color: var(--success);
+        }
+
+        .btn-hide-domain:hover {
+            color: #f87171;
+            border-color: #f87171;
+        }
+
         .loading {
             text-align: center;
             padding: 4rem;
@@ -658,6 +697,22 @@
                         </svg>
                     </div>
                     <div class="emails-list">
+                        <div class="domain-actions-bar">
+                            <button class="btn-copy-search" onclick="copySearchQuery('${domain.domain}', event)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy: from:(${domain.domain}) in:inbox
+                            </button>
+                            <button class="btn-hide-domain" onclick="hideDomain('${domain.domain}', event)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                                Hide domain
+                            </button>
+                        </div>
                         ${domain.emails.map(email => `
                             <div class="email-item">
                                 <div class="email-from">${escapeHtml(email.sender_name)}</div>
@@ -678,6 +733,50 @@
             }
             const card = document.querySelector(`.domain-card[data-domain="${domain}"]`);
             card.classList.toggle('expanded');
+        }
+
+        function copySearchQuery(domain, event) {
+            event.stopPropagation();
+            const query = `from:(${domain}) in:inbox`;
+            navigator.clipboard.writeText(query).then(() => {
+                const btn = event.target.closest('.btn-copy-search');
+                btn.classList.add('copied');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"></polyline></svg> Copied!`;
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = originalText;
+                }, 1500);
+            });
+        }
+
+        async function hideDomain(domain, event) {
+            event.stopPropagation();
+            
+            try {
+                const res = await fetch(`/hide-domain?domain=${encodeURIComponent(domain)}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    // Remove the card from UI with animation
+                    const card = document.querySelector(`.domain-card[data-domain="${domain}"]`);
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(-20px)';
+                    setTimeout(() => {
+                        card.remove();
+                        // Update stats
+                        const totalEmails = document.getElementById('total-emails');
+                        const totalDomains = document.getElementById('total-domains');
+                        totalEmails.textContent = data.total.toLocaleString();
+                        totalDomains.textContent = data.domain_count.toLocaleString();
+                        // Update cache info
+                        cacheStatus.textContent = `📦 ${data.total.toLocaleString()} emails cached`;
+                    }, 300);
+                }
+            } catch (err) {
+                alert('Error hiding domain: ' + err.message);
+            }
         }
 
         function escapeHtml(text) {

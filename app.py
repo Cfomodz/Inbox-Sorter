@@ -221,6 +221,39 @@ def get_cached():
     return jsonify({'error': 'No cached data'}), 404
 
 
+@app.route('/hide-domain')
+def hide_domain():
+    """Remove a domain from the cache."""
+    domain = request.args.get('domain')
+    if not domain:
+        return jsonify({'error': 'Domain required'}), 400
+    
+    cached = load_cache()
+    if not cached:
+        return jsonify({'error': 'No cached data'}), 404
+    
+    # Filter out the domain
+    original_domains = cached.get('domains', [])
+    filtered_domains = [d for d in original_domains if d['domain'] != domain]
+    
+    if len(filtered_domains) == len(original_domains):
+        return jsonify({'error': 'Domain not found'}), 404
+    
+    # Calculate new total
+    new_total = sum(d['count'] for d in filtered_domains)
+    
+    # Update cache
+    cached['domains'] = filtered_domains
+    cached['total'] = new_total
+    save_cache(cached)
+    
+    return jsonify({
+        'success': True,
+        'total': new_total,
+        'domain_count': len(filtered_domains)
+    })
+
+
 @app.route('/fetch-emails')
 def fetch_emails():
     """Fetch up to 1000 emails. Use load_more=true to continue from last position."""
