@@ -10,9 +10,10 @@ A simple app that pulls your Gmail inbox and sorts emails by sender domain. See 
 
 - 🔐 Secure OAuth2 authentication (read-only access)
 - 📊 Groups emails by sender domain
-- 📈 Shows email count per domain
+- 📈 Shows email count per domain, sorted by volume
 - 🔍 Expandable cards to browse individual emails
-- ⚡ Fetch up to 10,000 emails
+- 📦 Local caching — fetched emails persist between sessions
+- ⚡ Paginated fetching — 1,000 emails at a time, load more as needed
 
 ## Quick Start
 
@@ -71,16 +72,27 @@ Open http://localhost:3000 in your browser.
 ## Usage
 
 1. Click **Sign in with Google**
-2. Authorize the app (read-only access to your emails)
-3. Select how many emails to fetch
-4. Click **Fetch & Sort**
-5. Click on any domain to expand and see individual emails
+2. Authorize the app (read-only access)
+3. Click **Fetch First 1,000** to load your first batch
+4. View results sorted by sender domain
+5. Click **Load 1,000 More** to fetch additional emails
+6. Click any domain card to expand and see individual emails
+7. Use **Clear Cache** to start fresh or **Sign Out** when done
+
+## How It Works
+
+- Fetches emails in batches of 1,000 with rate limiting to avoid API limits
+- Each batch takes ~3-5 minutes depending on your connection
+- Results are cached locally in `cache/emails.json`
+- Returning to the app loads cached data instantly
+- "Load More" continues from where you left off
 
 ## Security
 
 - **Read-only access**: The app only requests permission to read emails, never modify or delete
-- **No storage**: Emails are fetched fresh each time and never stored on any server
-- **Session-based**: Your credentials are stored only in your browser session
+- **Local caching**: Emails are cached on your machine only, never sent to external servers
+- **Session-based**: OAuth credentials stored in browser session only
+- **Cache cleared on logout**: Signing out removes all cached data
 
 ## Tech Stack
 
